@@ -31,6 +31,7 @@
 
 #include "ccronexpr.h"
 
+#define CRON_MAX_DAY_SECONDS 86400
 #define CRON_MAX_SECONDS 60
 #define CRON_MAX_MINUTES 60
 #define CRON_MAX_HOURS 24
@@ -709,6 +710,47 @@ static char* set_number_hits(char* value, unsigned int min, unsigned int max, co
         return bits;
 }
 
+static int
+get_sencond_interval(char* value, const char** error)
+{
+    size_t i;
+    unsigned int i1;
+    int err;
+    size_t len = 0;
+    char **fields = split_str(value, ',', &len);
+
+    if (!fields) {
+        *error = "Comma split error";
+        return 0;
+    }
+    for (i =0; i < len; i++) {
+        if (has_char(fields[i], '/')) {
+            size_t len2 = 0;
+            char** split = split_str(fields[i], '/', &len2);
+
+            if (0 == len2 || len2 > 2) {
+                *error = "Incrementer has more than two fields";
+                free_splitted(split, len2);
+                free_splitted(fields, len);
+                return 0;
+            }
+            int err = 0;
+            unsigned int delta = parse_uint(split[1], &err);
+            if (err) {
+                *error = "Unsigned integer parse error 4";
+                free_splitted(split, len2);
+            }
+            free_splitted(split, len2);
+            free_splitted(fields, len);
+            return delta;
+        }
+
+
+    }
+
+}
+
+
 static char* set_months(char* value, const char** error) {
     int err;
     unsigned int i;
@@ -765,6 +807,7 @@ static char* set_days_of_month(char* field, const char** error) {
 
 cron_expr* cron_parse_expr(const char* expression, const char** error) {
     const char* err_local;
+    int   second_interval = 0;
     char* seconds = NULL;
     char* minutes = NULL;
     char* hours = NULL;
@@ -787,6 +830,8 @@ cron_expr* cron_parse_expr(const char* expression, const char** error) {
         *error = "Invalid number of fields, expression must consist of 6 fields";
         goto return_res;
     }
+    second_interval = get_sencond_interval(fields[0], error);
+    if (*error) goto return_res;
     seconds = set_number_hits(fields[0], 0, 60, error);
     if (*error) goto return_res;
     minutes = set_number_hits(fields[1], 0, 60, error);
@@ -822,6 +867,7 @@ cron_expr* cron_parse_expr(const char* expression, const char** error) {
         return NULL;
     }
     cron_expr* res = (cron_expr*) malloc(sizeof (cron_expr));
+    res->second_interval = second_interval;
     res->seconds = seconds;
     res->minutes = minutes;
     res->hours = hours;

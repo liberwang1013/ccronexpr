@@ -38,6 +38,7 @@ extern "C" {
  * Parsed cron expression
  */
 typedef struct {
+    int   second_interval;
     char* seconds;
     char* minutes;
     char* hours;
